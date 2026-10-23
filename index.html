@@ -1,537 +1,195 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub File Uploader (< 100MB)</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .drag-over {
-            border-color: #3b82f6 !important;
-            background-color: rgba(59, 130, 246, 0.05) !important;
-        }
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minecraft Save Auto-Zip & GitHub Uploader</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- JSZip để nén Folder thành file .zip ngay trên trình duyệt -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between">
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6 font-sans">
+  <div class="max-w-2xl mx-auto bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-700">
+    
+    <h1 class="text-2xl font-bold mb-2 text-emerald-400 flex items-center gap-2">
+      🎮 Minecraft Save Auto-Uploader
+    </h1>
+    <p class="text-slate-400 text-sm mb-6">Nén thư mục thế giới Minecraft thành ZIP và upload trực tiếp lên GitHub.</p>
 
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="p-2 bg-slate-900 text-white rounded-xl">
-                    <i data-lucide="github" class="w-6 h-6"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-slate-900 text-lg leading-tight">GitHub Uploader</h1>
-                    <p class="text-xs text-slate-500">Tải file lên GitHub Repository (< 100MB)</p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                    Git Data API
-                </span>
-            </div>
+    <!-- Cấu hình GitHub -->
+    <div class="space-y-4 mb-6 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Cấu hình GitHub</h2>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">GitHub Personal Access Token (PAT)</label>
+        <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxx" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">GitHub Owner (User/Org)</label>
+          <input type="text" id="ghOwner" placeholder="username" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
         </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="max-w-5xl mx-auto px-4 py-8 w-full flex-grow">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            <!-- Left Column: Cấu hình GitHub -->
-            <div class="lg:col-span-5 space-y-6">
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                        <h2 class="font-semibold text-slate-800 flex items-center gap-2">
-                            <i data-lucide="settings" class="w-4 h-4 text-slate-500"></i>
-                            Cấu hình GitHub
-                        </h2>
-                        <button id="btn-toggle-token" type="button" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-                            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-                            <span>Hiện Token</span>
-                        </button>
-                    </div>
-
-                    <form id="config-form" class="space-y-4">
-                        <!-- Personal Access Token -->
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">
-                                Personal Access Token (PAT) <span class="text-red-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx" required
-                                    class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                            </div>
-                            <p class="text-[11px] text-slate-400 mt-1">Yêu cầu scope <code class="bg-slate-100 px-1 rounded text-slate-600">repo</code> hoặc <code class="bg-slate-100 px-1 rounded text-slate-600">public_repo</code>.</p>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <!-- Owner -->
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">
-                                    Owner (User/Org) <span class="text-red-500">*</span>
-                                </label>
-                                <input type="text" id="gh-owner" placeholder="vivi-username" required
-                                    class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                            </div>
-                            <!-- Repo -->
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">
-                                    Repository <span class="text-red-500">*</span>
-                                </label>
-                                <input type="text" id="gh-repo" placeholder="my-repo" required
-                                    class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <!-- Branch -->
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">
-                                    Nhánh (Branch)
-                                </label>
-                                <input type="text" id="gh-branch" value="main" placeholder="main" required
-                                    class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                            </div>
-                            <!-- Path -->
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">
-                                    Thư mục (Folder Path)
-                                </label>
-                                <input type="text" id="gh-path" placeholder="uploads/ (để trống nếu ở gốc)"
-                                    class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                            </div>
-                        </div>
-
-                        <div class="pt-2">
-                            <button type="button" id="btn-save-config" class="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
-                                <i data-lucide="save" class="w-3.5 h-3.5"></i>
-                                Lưu cấu hình vào trình duyệt
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Hướng dẫn ngắn -->
-                <div class="bg-blue-50/60 border border-blue-100 p-4 rounded-xl text-xs text-blue-900 space-y-2">
-                    <div class="font-semibold flex items-center gap-1.5 text-blue-800">
-                        <i data-lucide="info" class="w-4 h-4"></i>
-                        Lưu ý về kích thước File & API
-                    </div>
-                    <ul class="list-disc pl-4 space-y-1 text-blue-800/80">
-                        <li>Trang web sử dụng <b>GitHub Git Data API</b> (Blobs $\rightarrow$ Tree $\rightarrow$ Commit) cho phép upload tối đa <b>100MB</b> per file.</li>
-                        <li>Token chỉ được lưu cục bộ trên Trình duyệt (LocalStorage) của bạn, đảm bảo an toàn tuyệt đối.</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Right Column: Kéo thả Upload File & Trạng thái -->
-            <div class="lg:col-span-7 space-y-6">
-                <!-- Zone Upload -->
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                    <h2 class="font-semibold text-slate-800 flex items-center gap-2 pb-3 border-b border-slate-100">
-                        <i data-lucide="upload-cloud" class="w-4 h-4 text-slate-500"></i>
-                        Chọn hoặc kéo thả File
-                    </h2>
-
-                    <!-- Dropzone -->
-                    <div id="drop-zone" class="border-2 border-dashed border-slate-300 hover:border-blue-400 rounded-2xl p-8 text-center transition-all cursor-pointer bg-slate-50/50 hover:bg-slate-50 flex flex-col items-center justify-center min-h-[220px]">
-                        <input type="file" id="file-input" class="hidden">
-                        
-                        <div id="drop-zone-idle" class="flex flex-col items-center space-y-3">
-                            <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-                                <i data-lucide="file-up" class="w-6 h-6"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-slate-700">Kéo & Drop file vào đây, hoặc <span class="text-blue-600 underline">duyệt tìm file</span></p>
-                                <p class="text-xs text-slate-400 mt-1">Hỗ trợ mọi loại file (Kích thước tối đa: <b class="text-slate-600">100MB</b>)</p>
-                            </div>
-                        </div>
-
-                        <!-- Đã chọn file -->
-                        <div id="drop-zone-selected" class="hidden w-full flex flex-col items-center space-y-3">
-                            <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                <i data-lucide="file-check" class="w-6 h-6"></i>
-                            </div>
-                            <div class="text-center">
-                                <p id="selected-filename" class="text-sm font-bold text-slate-800 break-all px-4"></p>
-                                <p id="selected-filesize" class="text-xs text-slate-500 mt-0.5"></p>
-                            </div>
-                            <button id="btn-change-file" type="button" class="text-xs text-slate-500 hover:text-slate-700 underline font-medium">
-                                Chọn file khác
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Input Commit Message tùy chọn -->
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">
-                            Commit Message (Tùy chọn)
-                        </label>
-                        <input type="text" id="commit-msg" placeholder="Upload file via GitHub Web Uploader"
-                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                    </div>
-
-                    <!-- Button Upload -->
-                    <button id="btn-upload" disabled class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
-                        <i data-lucide="upload" class="w-4 h-4"></i>
-                        <span>Bắt đầu Upload lên GitHub</span>
-                    </button>
-                </div>
-
-                <!-- Tiến trình Progress & Trạng thái -->
-                <div id="upload-status-card" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 hidden">
-                    <div class="flex items-center justify-between">
-                        <h3 id="status-title" class="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                            <i data-lucide="loader-2" class="w-4 h-4 text-blue-600 animate-spin" id="status-spinner"></i>
-                            <span>Đang xử lý...</span>
-                        </h3>
-                        <span id="progress-percent" class="text-xs font-bold text-blue-600">0%</span>
-                    </div>
-
-                    <!-- Progress Bar -->
-                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                        <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
-
-                    <!-- Trạng thái chi tiết bước -->
-                    <p id="status-detail" class="text-xs text-slate-500">Đang chuẩn bị đọc file...</p>
-
-                    <!-- Khối thông báo thành công hoặc lỗi -->
-                    <div id="message-box" class="hidden p-4 rounded-xl text-xs space-y-2"></div>
-                </div>
-            </div>
-
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Repository Name</label>
+          <input type="text" id="ghRepo" placeholder="minecraft-backups" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
         </div>
-    </main>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Branch</label>
+          <input type="text" id="ghBranch" value="main" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Folder trên Repo (Tùy chọn)</label>
+          <input type="text" id="ghFolderPath" placeholder="saves/" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+        </div>
+      </div>
+    </div>
 
-    <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
-        <p>Giao diện Upload File GitHub &bull; Tối ưu hóa cho các file lớn tới 100MB qua Git Data REST API</p>
-    </footer>
+    <!-- Hỗ trợ chọn Minecraft Save -->
+    <div class="mb-6 p-4 bg-emerald-950/30 border border-emerald-800/50 rounded-xl">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <p class="text-xs font-semibold text-emerald-400">Đường dẫn Save Minecraft:</p>
+          <code class="text-xs text-slate-300 bg-slate-900 px-2 py-1 rounded mt-1 inline-block">%appdata%\.minecraft\saves</code>
+        </div>
+        <button onclick="copyPath()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-2 rounded-lg font-medium transition">
+          📋 Copy đường dẫn
+        </button>
+      </div>
+      <p id="copyTooltip" class="text-xs text-emerald-400 mt-2 hidden">✓ Đã copy! Hãy dán (Ctrl+V) vào thanh địa chỉ khi cửa sổ chọn thư mục mở ra.</p>
+    </div>
 
-    <!-- JavaScript Engine -->
-    <script>
-        // Khởi tạo Lucide Icons
-        lucide.createIcons();
+    <!-- Chọn Folder & Tải lên -->
+    <div class="space-y-4">
+      <label class="block text-sm font-medium text-slate-300">Chọn thư mục World Minecraft để Zip & Upload:</label>
+      
+      <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" onchange="handleFolderSelect(event)">
+      
+      <button onclick="document.getElementById('folderInput').click()" class="w-full border-2 border-dashed border-slate-600 hover:border-emerald-500 bg-slate-900/50 hover:bg-slate-900 text-slate-300 py-8 rounded-xl flex flex-col items-center justify-center transition cursor-pointer">
+        <span class="text-3xl mb-2">📁</span>
+        <span class="text-sm font-medium">Bấm vào đây để chọn thư mục World Minecraft</span>
+        <span class="text-xs text-slate-500 mt-1">(Hệ thống sẽ tự động zip thành 1 file duy nhất)</span>
+      </button>
 
-        // DOM Elements
-        const ghTokenInput = document.getElementById('gh-token');
-        const ghOwnerInput = document.getElementById('gh-owner');
-        const ghRepoInput = document.getElementById('gh-repo');
-        const ghBranchInput = document.getElementById('gh-branch');
-        const ghPathInput = document.getElementById('gh-path');
-        const btnSaveConfig = document.getElementById('btn-save-config');
-        const btnToggleToken = document.getElementById('btn-toggle-token');
+      <div id="statusArea" class="hidden space-y-2">
+        <div class="flex justify-between text-xs text-slate-400">
+          <span id="statusText">Đang xử lý...</span>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+          <div id="progressBar" class="bg-emerald-500 h-full w-0 transition-all duration-200"></div>
+        </div>
+      </div>
+    </div>
 
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        const dropZoneIdle = document.getElementById('drop-zone-idle');
-        const dropZoneSelected = document.getElementById('drop-zone-selected');
-        const selectedFilename = document.getElementById('selected-filename');
-        const selectedFilesize = document.getElementById('selected-filesize');
-        const btnChangeFile = document.getElementById('btn-change-file');
-        const commitMsgInput = document.getElementById('commit-msg');
-        const btnUpload = document.getElementById('btn-upload');
+  </div>
 
-        const uploadStatusCard = document.getElementById('upload-status-card');
-        const statusTitle = document.getElementById('status-title');
-        const statusSpinner = document.getElementById('status-spinner');
-        const progressPercent = document.getElementById('progress-percent');
-        const progressBar = document.getElementById('progress-bar');
-        const statusDetail = document.getElementById('status-detail');
-        const messageBox = document.getElementById('message-box');
+  <script>
+    // 1. Copy đường dẫn Save vào Clipboard
+    function copyPath() {
+      navigator.clipboard.writeText("%appdata%\\.minecraft\\saves");
+      const tooltip = document.getElementById('copyTooltip');
+      tooltip.classList.remove('hidden');
+      setTimeout(() => tooltip.classList.add('hidden'), 4000);
+    }
 
-        let currentFile = null;
+    // 2. Xử lý khi chọn Folder
+    async function handleFolderSelect(event) {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
 
-        // 1. Quản lý Cấu hình (LocalStorage)
-        function loadConfig() {
-            ghTokenInput.value = localStorage.getItem('gh_uploader_token') || '';
-            ghOwnerInput.value = localStorage.getItem('gh_uploader_owner') || '';
-            ghRepoInput.value = localStorage.getItem('gh_uploader_repo') || '';
-            ghBranchInput.value = localStorage.getItem('gh_uploader_branch') || 'main';
-            ghPathInput.value = localStorage.getItem('gh_uploader_path') || '';
+      const token = document.getElementById('ghToken').value.trim();
+      const owner = document.getElementById('ghOwner').value.trim();
+      const repo = document.getElementById('ghRepo').value.trim();
+      const branch = document.getElementById('ghBranch').value.trim() || 'main';
+      let folderPath = document.getElementById('ghFolderPath').value.trim();
+
+      if (!token || !owner || !repo) {
+        alert('Vui lòng điền đầy đủ GitHub Token, Owner và Repo!');
+        return;
+      }
+
+      // Xác định tên thư mục gốc (Tên thế giới Minecraft)
+      const firstFilePath = files[0].webkitRelativePath;
+      const worldFolderName = firstFilePath.split('/')[0] || 'Minecraft_World';
+      const zipFileName = `${worldFolderName}_${Date.now()}.zip`;
+
+      const statusArea = document.getElementById('statusArea');
+      const statusText = document.getElementById('statusText');
+      const progressBar = document.getElementById('progressBar');
+      const progressPercent = document.getElementById('progressPercent');
+
+      statusArea.classList.remove('hidden');
+      
+      try {
+        // --- BƯỚC 1: TỰ ĐỘNG ZIP FOLDER ---
+        statusText.innerText = `Đang nén thư mục "${worldFolderName}" thành ZIP...`;
+        progressBar.style.width = '20%';
+        progressPercent.innerText = '20%';
+
+        const zip = new JSZip();
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          // Giữ nguyên cấu trúc thư mục con trong ZIP
+          const relativePath = file.webkitRelativePath.substring(worldFolderName.length + 1);
+          if (relativePath) {
+            zip.file(relativePath, file);
+          }
         }
 
-        btnSaveConfig.addEventListener('click', () => {
-            localStorage.setItem('gh_uploader_token', ghTokenInput.value.trim());
-            localStorage.setItem('gh_uploader_owner', ghOwnerInput.value.trim());
-            localStorage.setItem('gh_uploader_repo', ghRepoInput.value.trim());
-            localStorage.setItem('gh_uploader_branch', ghBranchInput.value.trim());
-            localStorage.setItem('gh_uploader_path', ghPathInput.value.trim());
-            
-            showBanner('success', 'Đã lưu cấu hình vào LocalStorage thành công!');
+        const zipBlob = await zip.generateAsync({ type: "blob" }, (metadata) => {
+          const p = Math.round(20 + (metadata.percent * 0.3));
+          progressBar.style.width = `${p}%`;
+          progressPercent.innerText = `${p}%`;
         });
 
-        // Toggle hiển thị password/token
-        btnToggleToken.addEventListener('click', () => {
-            const isPassword = ghTokenInput.type === 'password';
-            ghTokenInput.type = isPassword ? 'text' : 'password';
-            btnToggleToken.querySelector('span').textContent = isPassword ? 'Ẩn Token' : 'Hiện Token';
-        });
+        // --- BƯỚC 2: ĐẨY FILE ZIP LÊN GITHUB (Bằng Git Data API - Blobs) ---
+        statusText.innerText = `Đang tải ${zipFileName} lên GitHub...`;
+        progressBar.style.width = '60%';
+        progressPercent.innerText = '60%';
 
-        // 2. Xử lý Drag & Drop & File Select
-        dropZone.addEventListener('click', (e) => {
-            if (e.target !== btnChangeFile) fileInput.click();
-        });
+        // Chuyển blob thành Base64
+        const reader = new FileReader();
+        reader.readAsDataURL(zipBlob);
+        reader.onloadend = async () => {
+          const base64Content = reader.result.split(',')[1];
+          
+          if (folderPath && !folderPath.endsWith('/')) folderPath += '/';
+          const fullPathOnRepo = `${folderPath}${zipFileName}`;
 
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
-        });
+          // Upload trực tiếp dùng GitHub Contents API
+          const uploadUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${fullPathOnRepo}`;
+          
+          const response = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `token ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: `Backup Minecraft World: ${worldFolderName}`,
+              content: base64Content,
+              branch: branch
+            })
+          });
 
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dropZone.classList.add('drag-over');
-            }, false);
-        });
+          if (response.ok) {
+            progressBar.style.width = '100%';
+            progressPercent.innerText = '100%';
+            statusText.innerText = `✅ Đã nén & upload thành công file ${zipFileName}!`;
+          } else {
+            const err = await response.json();
+            throw new Error(err.message || 'Lỗi upload lên GitHub');
+          }
+        };
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dropZone.classList.remove('drag-over');
-            }, false);
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            const files = e.dataTransfer.files;
-            if (files.length > 0) handleFileSelect(files[0]);
-        });
-
-        btnChangeFile.addEventListener('click', (e) => {
-            e.stopPropagation();
-            fileInput.click();
-        });
-
-        function handleFileSelect(file) {
-            // Kiểm tra dung lượng (100MB = 100 * 1024 * 1024 bytes)
-            const MAX_SIZE = 100 * 1024 * 1024;
-            if (file.size > MAX_SIZE) {
-                alert('File của bạn vượt quá giới hạn 100MB. Vui lòng chọn file nhỏ hơn.');
-                return;
-            }
-
-            currentFile = file;
-            selectedFilename.textContent = file.name;
-            selectedFilesize.textContent = formatBytes(file.size);
-
-            dropZoneIdle.classList.add('hidden');
-            dropZoneSelected.classList.remove('hidden');
-            btnUpload.disabled = false;
-        }
-
-        function formatBytes(bytes, decimals = 2) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const dm = decimals < 0 ? 0 : decimals;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-        }
-
-        // 3. Quy trình Upload bằng GitHub Git Data API (Blobs -> Trees -> Commits -> Update Ref)
-        btnUpload.addEventListener('click', async () => {
-            const token = ghTokenInput.value.trim();
-            const owner = ghOwnerInput.value.trim();
-            const repo = ghRepoInput.value.trim();
-            const branch = ghBranchInput.value.trim() || 'main';
-            let folderPath = ghPathInput.value.trim();
-
-            if (!token || !owner || !repo) {
-                alert('Vui lòng điền đầy đủ Personal Access Token, Owner và Repo!');
-                return;
-            }
-
-            if (!currentFile) return;
-
-            // Đảm bảo đường dẫn folder chuẩn xác
-            if (folderPath && !folderPath.endsWith('/')) folderPath += '/';
-            if (folderPath.startsWith('/')) folderPath = folderPath.substring(1);
-
-            const filePathOnRepo = `${folderPath}${currentFile.name}`;
-            const commitMessage = commitMsgInput.value.trim() || `Upload ${currentFile.name} via Web API`;
-
-            // Reset UI Tiến trình
-            uploadStatusCard.classList.remove('hidden');
-            messageBox.classList.add('hidden');
-            btnUpload.disabled = true;
-            updateProgress(5, "Đang đọc nội dung file...");
-
-            try {
-                // BƯỚC 1: Chuyển File thành Base64
-                const base64Content = await fileToBase64(currentFile, (p) => {
-                    updateProgress(5 + Math.round(p * 0.25), "Đang mã hóa dữ liệu file (Base64)...");
-                });
-
-                // BƯỚC 2: Tạo Blob trên GitHub Git Database API
-                updateProgress(35, "Đang tải Blob dữ liệu lên GitHub...");
-                const blobRes = await fetchGH(`https://api.github.com/repos/${owner}/${repo}/git/blobs`, token, 'POST', {
-                    content: base64Content,
-                    encoding: 'base64'
-                });
-                const blobSha = blobRes.sha;
-
-                // BƯỚC 3: Lấy SHA của Commit mới nhất trên Branch
-                updateProgress(55, `Đang lấy thông tin SHA của nhánh '${branch}'...`);
-                const refRes = await fetchGH(`https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${branch}`, token, 'GET');
-                const latestCommitSha = refRes.object.sha;
-
-                // BƯỚC 4: Lấy Tree SHA của Commit mới nhất
-                updateProgress(65, "Đang lấy cây dữ liệu (Tree) hiện tại...");
-                const commitInfoRes = await fetchGH(`https://api.github.com/repos/${owner}/${repo}/git/commits/${latestCommitSha}`, token, 'GET');
-                const baseTreeSha = commitInfoRes.tree.sha;
-
-                // BƯỚC 5: Tạo Tree mới bao gồm File Blob vừa tải lên
-                updateProgress(75, "Đang cập nhật cây thư mục (Tree)...");
-                const newTreeRes = await fetchGH(`https://api.github.com/repos/${owner}/${repo}/git/trees`, token, 'POST', {
-                    base_tree: baseTreeSha,
-                    tree: [{
-                        path: filePathOnRepo,
-                        mode: '100644', // 100644 biểu thị cho file thông thường
-                        type: 'blob',
-                        sha: blobSha
-                    }]
-                });
-                const newTreeSha = newTreeRes.sha;
-
-                // BƯỚC 6: Tạo Commit mới
-                updateProgress(85, "Đang tạo commit mới...");
-                const newCommitRes = await fetchGH(`https://api.github.com/repos/${owner}/${repo}/git/commits`, token, 'POST', {
-                    message: commitMessage,
-                    tree: newTreeSha,
-                    parents: [latestCommitSha]
-                });
-                const newCommitSha = newCommitRes.sha;
-
-                // BƯỚC 7: Cập nhật HEAD Reference của Branch đến Commit mới
-                updateProgress(95, "Đang cập nhật nhánh reference...");
-                await fetchGH(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branch}`, token, 'PATCH', {
-                    sha: newCommitSha,
-                    force: false
-                });
-
-                // Tải lên thành công!
-                updateProgress(100, "Hoàn tất upload!");
-                
-                const fileGithubUrl = `https://github.com/${owner}/${repo}/blob/${branch}/${filePathOnRepo}`;
-                showBanner('success', `
-                    <div class="space-y-1">
-                        <p class="font-bold">🎉 Upload thành công!</p>
-                        <p>File của bạn đã được đưa lên repository thành công tại đường dẫn:</p>
-                        <a href="${fileGithubUrl}" target="_blank" rel="noopener noreferrer" class="font-semibold underline flex items-center gap-1 hover:text-emerald-900 break-all">
-                            <span>${fileGithubUrl}</span>
-                            <i data-lucide="external-link" class="w-3 h-3 inline"></i>
-                        </a>
-                    </div>
-                `);
-
-            } catch (err) {
-                console.error(err);
-                updateProgress(0, "Xảy ra lỗi trong quá trình tải lên!");
-                showBanner('error', `<b>Thất bại:</b> ${err.message || 'Không thể upload file lên GitHub.'}`);
-            } finally {
-                btnUpload.disabled = false;
-            }
-        });
-
-        // Helper API Fetcher
-        async function fetchGH(url, token, method = 'GET', body = null) {
-            const headers = {
-                'Authorization': `token ${token}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json'
-            };
-
-            const options = { method, headers };
-            if (body) options.body = JSON.stringify(body);
-
-            const res = await fetch(url, options);
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.message || `API Error (${res.status})`);
-            }
-            return data;
-        }
-
-        // Helper đọc file sang Base64
-        function fileToBase64(file, onProgress) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-
-                reader.onprogress = (data) => {
-                    if (data.lengthComputable && onProgress) {
-                        const percent = (data.loaded / data.total) * 100;
-                        onProgress(percent);
-                    }
-                };
-
-                reader.onload = () => {
-                    // Cắt bỏ tiền tố Data URL (ví dụ: "data:image/png;base64,")
-                    const base64String = reader.result.split(',')[1];
-                    resolve(base64String);
-                };
-
-                reader.onerror = (error) => reject(error);
-            });
-        }
-
-        // Cập nhật thanh tiến trình UI
-        function updateProgress(percent, detail) {
-            progressBar.style.width = `${percent}%`;
-            progressPercent.textContent = `${percent}%`;
-            statusDetail.textContent = detail;
-
-            if (percent === 100 || messageBox.classList.contains('block')) {
-                statusSpinner.classList.add('hidden');
-            } else {
-                statusSpinner.classList.remove('hidden');
-            }
-        }
-
-        // Hiển thị Banner kết quả
-        function showBanner(type, htmlContent) {
-            messageBox.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'border-emerald-200', 'bg-red-50', 'text-red-800', 'border-red-200');
-            messageBox.classList.add('border');
-
-            if (type === 'success') {
-                messageBox.classList.add('bg-emerald-50', 'text-emerald-800', 'border-emerald-200');
-            } else {
-                messageBox.classList.add('bg-red-50', 'text-red-800', 'border-red-200');
-            }
-
-            messageBox.innerHTML = htmlContent;
-            lucide.createIcons();
-        }
-
-        // Load cấu hình đã lưu nếu có khi khởi tạo
-        window.addEventListener('DOMContentLoaded', loadConfig);
-    </script>
+      } catch (error) {
+        alert(`Có lỗi xảy ra: ${error.message}`);
+        statusText.innerText = `❌ Thất bại: ${error.message}`;
+        progressBar.style.width = '0%';
+      }
+    }
+  </script>
 </body>
 </html>
